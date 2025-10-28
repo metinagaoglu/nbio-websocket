@@ -12,11 +12,25 @@ import (
 )
 
 func main() {
-	// ✅ Create context with cancellation for graceful shutdown
+	// Load configuration
+	cfg := internal.LoadConfig()
+
+	// Validate configuration
+	if err := cfg.Validate(); err != nil {
+		log.Fatalf("Invalid configuration: %v", err)
+	}
+
+	log.Printf("Configuration loaded:")
+	log.Printf("  Server: %s", cfg.ServerAddr())
+	log.Printf("  Log Level: %s", cfg.Log.Level)
+	log.Printf("  Client Buffer: %d", cfg.Client.SendBufferSize)
+	log.Printf("  Ping Interval: %v", cfg.Client.PingInterval)
+
+	// Create context with cancellation for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// ✅ Setup signal handling for graceful shutdown
+	// Setup signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
@@ -32,13 +46,12 @@ func main() {
 	// Start server in goroutine
 	errChan := make(chan error, 1)
 	go func() {
-		log.Println("Starting WebSocket server on :8080/ws")
-		if err := internal.StartServerWithRouter(hub, router); err != nil {
+		if err := internal.StartServerWithRouter(hub, router, cfg); err != nil {
 			errChan <- err
 		}
 	}()
 
-	// ✅ Wait for shutdown signal or error
+	// Wait for shutdown signal or error
 	select {
 	case <-sigChan:
 		log.Println("Shutdown signal received, cleaning up...")

@@ -15,12 +15,12 @@ type Client struct {
 	done   chan struct{} // ✅ Coordination channel for shutdown
 }
 
-func NewClient(hub *Hub, conn *websocket.Conn) *Client {
+func NewClient(hub *Hub, conn *websocket.Conn, bufferSize int) *Client {
 	return &Client{
 		hub:  hub,
 		conn: conn,
-		send: make(chan []byte, 256),
-		done: make(chan struct{}), // ✅ Initialize coordination channel
+		send: make(chan []byte, bufferSize), // ✅ Configurable buffer size
+		done: make(chan struct{}),
 	}
 }
 

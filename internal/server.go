@@ -3,19 +3,21 @@ package internal
 import (
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/lesismal/nbio/nbhttp/websocket"
 )
 
-func StartServerWithRouter(hub *Hub, router *Router) error {
+func StartServerWithRouter(hub *Hub, router *Router, cfg *Config) error {
 	upgrader := websocket.NewUpgrader()
 
+	// Set max message size (nbio uses MessageLengthLimit)
+	upgrader.MessageLengthLimit = int(cfg.Client.MaxMessageSize)
+
 	upgrader.OnOpen(func(c *websocket.Conn) {
-		client := NewClient(hub, c)
+		client := NewClient(hub, c, cfg.Client.SendBufferSize)
 		hub.register <- client
 		go client.WritePump()
-		go client.StartPing(10 * time.Second)
+		go client.StartPing(cfg.Client.PingInterval)
 	})
 
 	upgrader.OnMessage(func(c *websocket.Conn, msgType websocket.MessageType, data []byte) {
@@ -44,6 +46,7 @@ func StartServerWithRouter(hub *Hub, router *Router) error {
 		}
 	})
 
-	log.Println("WebSocket server started on :8080/ws")
-	return http.ListenAndServe(":8080", nil)
+	addr := cfg.ServerAddr()
+	log.Printf("WebSocket server starting on %s/ws", addr)
+	return http.ListenAndServe(addr, nil)
 }

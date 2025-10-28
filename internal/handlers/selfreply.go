@@ -2,20 +2,56 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"nbio-websocket/internal"
 )
 
 // SelfReplyHandler: Sadece mesajı gönderen kullanıcıya yanıt döner.
 func SelfReplyHandler(client *internal.Client, req *internal.JsonRPCRequest) {
-	resp := internal.JsonRPCResponse{
-		JSONRPC: "2.0",
-		Result:  map[string]interface{}{"echo": req.Params},
-		ID:      req.ID,
-	}
-	msg, err := json.Marshal(resp)
-	if err != nil {
-		// TODO: Phase 2 - Send error response to client
+	// Validate params
+	params, ok := req.Params.(map[string]interface{})
+	if !ok {
+		resp := internal.NewErrorResponse(
+			req.ID,
+			internal.InvalidParams,
+			"Invalid params",
+			map[string]string{"expected": "object"},
+		)
+		sendErrorResponse(client, resp)
 		return
 	}
+
+	// Validate required fields
+	text, ok := params["text"].(string)
+	if !ok || text == "" {
+		resp := internal.NewErrorResponse(
+			req.ID,
+			internal.InvalidParams,
+			"Invalid params",
+			map[string]string{"detail": "text field is required and must be a non-empty string"},
+		)
+		sendErrorResponse(client, resp)
+		return
+	}
+
+	// Send echo response
+	resp := internal.NewSuccessResponse(req.ID, map[string]interface{}{
+		"echo":        text,
+		"text_length": len(text),
+	})
+
+	msg, err := json.Marshal(resp)
+	if err != nil {
+		log.Printf("SelfReplyHandler: Marshal error: %v", err)
+		errResp := internal.NewErrorResponse(
+			req.ID,
+			internal.InternalError,
+			"Internal error",
+			map[string]string{"detail": err.Error()},
+		)
+		sendErrorResponse(client, errResp)
+		return
+	}
+
 	client.Send(msg)
 }
