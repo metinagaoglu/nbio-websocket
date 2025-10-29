@@ -8,13 +8,18 @@ import (
 
 	"go.uber.org/zap"
 
-	"nbio-websocket/internal"
+	"nbio-websocket/internal/config"
+	"nbio-websocket/internal/core"
 	"nbio-websocket/internal/handlers"
+	"nbio-websocket/internal/observability"
+	"nbio-websocket/internal/protocol"
+	"nbio-websocket/internal/security"
+	"nbio-websocket/internal/transport"
 )
 
 func main() {
 	// Load configuration
-	cfg := internal.LoadConfig()
+	cfg := config.LoadConfig()
 
 	// Validate configuration
 	if err := cfg.Validate(); err != nil {
@@ -22,18 +27,18 @@ func main() {
 	}
 
 	// Initialize logger
-	if err := internal.InitLogger(&cfg.Log); err != nil {
+	if err := observability.InitLogger(&cfg.Log); err != nil {
 		panic("Failed to initialize logger: " + err.Error())
 	}
-	defer internal.Sync()
+	defer observability.Sync()
 
 	// Initialize metrics
-	internal.InitMetrics()
+	observability.InitMetrics()
 
 	// Initialize authentication
-	internal.InitAuth(cfg.Security.AuthEnabled, cfg.Security.BearerTokens)
+	security.InitAuth(cfg.Security.AuthEnabled, cfg.Security.BearerTokens)
 
-	internal.Info("Configuration loaded",
+	observability.Info("Configuration loaded",
 		zap.String("server", cfg.ServerAddr()),
 		zap.String("log_level", cfg.Log.Level),
 		zap.Int("buffer_size", cfg.Client.SendBufferSize),
@@ -52,26 +57,26 @@ func main() {
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
 	// Create hub and start with context
-	hub := internal.NewHub()
+	hub := core.NewHub()
 	go hub.Run(ctx)
 
 	// Setup router
-	router := internal.NewRouter()
+	router := protocol.NewRouter()
 	router.Register("broadcast", handlers.BroadcastHandler)
 	router.Register("self.reply", handlers.SelfReplyHandler)
 
 	// Start metrics server in goroutine
 	go func() {
 		metricsAddr := cfg.Server.Host + ":9090"
-		if err := internal.StartMetricsServer(metricsAddr); err != nil {
-			internal.Error("Metrics server error", zap.Error(err))
+		if err := transport.StartMetricsServer(metricsAddr); err != nil {
+			observability.Error("Metrics server error", zap.Error(err))
 		}
 	}()
 
 	// Start server in goroutine
 	errChan := make(chan error, 1)
 	go func() {
-		if err := internal.StartServerWithRouter(hub, router, cfg); err != nil {
+		if err := transport.StartServer(hub, router, cfg); err != nil {
 			errChan <- err
 		}
 	}()
@@ -79,11 +84,11 @@ func main() {
 	// Wait for shutdown signal or error
 	select {
 	case <-sigChan:
-		internal.Info("Shutdown signal received, cleaning up...")
+		observability.Info("Shutdown signal received, cleaning up...")
 		cancel() // Cancel context to stop hub
-		internal.Info("Server stopped gracefully")
+		observability.Info("Server stopped gracefully")
 
 	case err := <-errChan:
-		internal.Fatal("Server error", zap.Error(err))
+		observability.Fatal("Server error", zap.Error(err))
 	}
 }

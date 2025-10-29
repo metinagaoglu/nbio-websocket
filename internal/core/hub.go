@@ -1,10 +1,12 @@
-package internal
+package core
 
 import (
 	"context"
 	"sync"
 
 	"go.uber.org/zap"
+
+	"nbio-websocket/internal/observability"
 )
 
 type Hub struct {
@@ -21,6 +23,14 @@ func (h *Hub) Broadcast() chan []byte {
 	return h.broadcast
 }
 
+func (h *Hub) Register(client *Client) {
+	h.register <- client
+}
+
+func (h *Hub) Unregister(client *Client) {
+	h.unregister <- client
+}
+
 func NewHub() *Hub {
 	return &Hub{
 		clients:      make(map[*Client]bool),
@@ -33,14 +43,14 @@ func NewHub() *Hub {
 }
 
 func (h *Hub) Run(ctx context.Context) {
-	Info("Hub started")
+	observability.Info("Hub started")
 
 	for {
 		select {
 		case <-ctx.Done():
-			Info("Hub shutdown initiated")
+			observability.Info("Hub shutdown initiated")
 			h.closeAllClients()
-			Info("Hub shutdown complete")
+			observability.Info("Hub shutdown complete")
 			return
 
 		case client := <-h.register:
@@ -49,8 +59,8 @@ func (h *Hub) Run(ctx context.Context) {
 			h.connToClient[client.conn] = client
 			count := len(h.clients)
 			h.mu.Unlock()
-			GetMetrics().IncrementConnections()
-			Info("Client registered",
+			observability.GetMetrics().IncrementConnections()
+			observability.Info("Client registered",
 				zap.Int("total_clients", count),
 			)
 
@@ -61,8 +71,8 @@ func (h *Hub) Run(ctx context.Context) {
 				delete(h.connToClient, client.conn)
 				close(client.send)
 				count := len(h.clients)
-				GetMetrics().IncrementDisconnects()
-				Info("Client unregistered",
+				observability.GetMetrics().IncrementDisconnects()
+				observability.Info("Client unregistered",
 					zap.Int("remaining_clients", count),
 				)
 			}
@@ -74,13 +84,13 @@ func (h *Hub) Run(ctx context.Context) {
 				delete(h.clients, client)
 				delete(h.connToClient, client.conn)
 				close(client.send)
-				GetMetrics().IncrementDisconnects()
-				Warn("Client disconnected due to send failure")
+				observability.GetMetrics().IncrementDisconnects()
+				observability.Warn("Client disconnected due to send failure")
 			}
 			h.mu.Unlock()
 
 		case message := <-h.broadcast:
-			GetMetrics().IncrementBroadcasts()
+			observability.GetMetrics().IncrementBroadcasts()
 			h.mu.RLock()
 			clientCount := 0
 			for client := range h.clients {
@@ -98,7 +108,7 @@ func (h *Hub) Run(ctx context.Context) {
 			h.mu.RUnlock()
 			// Track actual messages sent
 			for i := 0; i < clientCount; i++ {
-				GetMetrics().IncrementMessagesSent()
+				observability.GetMetrics().IncrementMessagesSent()
 			}
 		}
 	}
@@ -125,5 +135,5 @@ func (h *Hub) closeAllClients() {
 	// Clear maps
 	h.clients = make(map[*Client]bool)
 	h.connToClient = make(map[interface{}]*Client)
-	Info("Closed all clients", zap.Int("count", count))
+	observability.Info("Closed all clients", zap.Int("count", count))
 }

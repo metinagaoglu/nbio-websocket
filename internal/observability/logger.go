@@ -1,4 +1,4 @@
-package internal
+package observability
 
 import (
 	"go.uber.org/zap"
@@ -7,6 +7,12 @@ import (
 
 // Logger is the global structured logger
 var Logger *zap.Logger
+
+// LogConfig contains logging settings
+type LogConfig struct {
+	Level  string // debug, info, warn, error
+	Format string // text, json
+}
 
 // InitLogger initializes the global logger based on configuration
 func InitLogger(cfg *LogConfig) error {

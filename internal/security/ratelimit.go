@@ -1,10 +1,12 @@
-package internal
+package security
 
 import (
 	"sync"
 	"time"
 
 	"go.uber.org/zap"
+
+	"nbio-websocket/internal/observability"
 )
 
 // RateLimiter implements token bucket rate limiting per client
@@ -77,8 +79,8 @@ func (rl *RateLimiter) Allow(clientID interface{}) bool {
 		return true
 	}
 
-	GetMetrics().IncrementErrors()
-	Debug("Rate limit exceeded",
+	observability.GetMetrics().IncrementErrors()
+	observability.Debug("Rate limit exceeded",
 		zap.Any("client", clientID),
 		zap.Int("tokens", b.tokens),
 	)

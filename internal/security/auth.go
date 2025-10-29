@@ -1,4 +1,4 @@
-package internal
+package security
 
 import (
 	"crypto/subtle"
@@ -8,6 +8,8 @@ import (
 	"sync"
 
 	"go.uber.org/zap"
+
+	"nbio-websocket/internal/observability"
 )
 
 var (
@@ -40,11 +42,11 @@ func InitAuth(enabled bool, tokens []string) {
 	}
 
 	if enabled {
-		Info("Authentication enabled",
+		observability.Info("Authentication enabled",
 			zap.Int("token_count", len(GlobalAuth.BearerTokens)),
 		)
 	} else {
-		Info("Authentication disabled")
+		observability.Info("Authentication disabled")
 	}
 }
 
@@ -60,7 +62,7 @@ func (ac *AuthConfig) ValidateRequest(r *http.Request) error {
 		// Check query parameter as fallback
 		token := r.URL.Query().Get("token")
 		if token == "" {
-			Debug("Missing authentication token")
+			observability.Debug("Missing authentication token")
 			return ErrMissingToken
 		}
 		return ac.ValidateToken(token)
@@ -69,7 +71,7 @@ func (ac *AuthConfig) ValidateRequest(r *http.Request) error {
 	// Parse Bearer token
 	parts := strings.SplitN(authHeader, " ", 2)
 	if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
-		Debug("Invalid authorization header format")
+		observability.Debug("Invalid authorization header format")
 		return ErrInvalidToken
 	}
 
@@ -96,8 +98,8 @@ func (ac *AuthConfig) ValidateToken(token string) error {
 		}
 	}
 
-	Debug("Invalid authentication token attempted")
-	GetMetrics().IncrementErrors()
+	observability.Debug("Invalid authentication token attempted")
+	observability.GetMetrics().IncrementErrors()
 	return ErrInvalidToken
 }
 
@@ -111,7 +113,7 @@ func (ac *AuthConfig) AddToken(token string) {
 	ac.BearerTokens[token] = true
 	ac.mu.Unlock()
 
-	Info("Authentication token added")
+	observability.Info("Authentication token added")
 }
 
 // RemoveToken removes a token (thread-safe)
@@ -120,7 +122,7 @@ func (ac *AuthConfig) RemoveToken(token string) {
 	delete(ac.BearerTokens, token)
 	ac.mu.Unlock()
 
-	Info("Authentication token removed")
+	observability.Info("Authentication token removed")
 }
 
 // IsEnabled returns whether authentication is enabled

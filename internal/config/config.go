@@ -1,4 +1,4 @@
-package internal
+package config
 
 import (
 	"fmt"
@@ -6,13 +6,15 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"nbio-websocket/internal/observability"
 )
 
 // Config holds all configuration for the WebSocket server
 type Config struct {
 	Server   ServerConfig
 	Client   ClientConfig
-	Log      LogConfig
+	Log      observability.LogConfig
 	Security SecurityConfig
 }
 
@@ -32,11 +34,6 @@ type ClientConfig struct {
 	MaxMessageSize int64
 }
 
-// LogConfig contains logging settings
-type LogConfig struct {
-	Level  string // debug, info, warn, error
-	Format string // text, json
-}
 
 // SecurityConfig contains security settings
 type SecurityConfig struct {
@@ -68,7 +65,7 @@ func DefaultConfig() *Config {
 			PongTimeout:    60 * time.Second,
 			MaxMessageSize: 1024 * 1024, // 1MB
 		},
-		Log: LogConfig{
+		Log: observability.LogConfig{
 			Level:  "info",
 			Format: "text",
 		},

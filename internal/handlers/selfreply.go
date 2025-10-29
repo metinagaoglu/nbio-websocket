@@ -5,17 +5,19 @@ import (
 
 	"go.uber.org/zap"
 
-	"nbio-websocket/internal"
+	"nbio-websocket/internal/core"
+	"nbio-websocket/internal/observability"
+	"nbio-websocket/internal/protocol"
 )
 
 // SelfReplyHandler: Sadece mesajı gönderen kullanıcıya yanıt döner.
-func SelfReplyHandler(client *internal.Client, req *internal.JsonRPCRequest) {
+func SelfReplyHandler(client *core.Client, req *protocol.JsonRPCRequest) {
 	// Validate params
 	params, ok := req.Params.(map[string]interface{})
 	if !ok {
-		resp := internal.NewErrorResponse(
+		resp := protocol.NewErrorResponse(
 			req.ID,
-			internal.InvalidParams,
+			protocol.InvalidParams,
 			"Invalid params",
 			map[string]string{"expected": "object"},
 		)
@@ -26,9 +28,9 @@ func SelfReplyHandler(client *internal.Client, req *internal.JsonRPCRequest) {
 	// Validate required fields
 	text, ok := params["text"].(string)
 	if !ok || text == "" {
-		resp := internal.NewErrorResponse(
+		resp := protocol.NewErrorResponse(
 			req.ID,
-			internal.InvalidParams,
+			protocol.InvalidParams,
 			"Invalid params",
 			map[string]string{"detail": "text field is required and must be a non-empty string"},
 		)
@@ -37,17 +39,17 @@ func SelfReplyHandler(client *internal.Client, req *internal.JsonRPCRequest) {
 	}
 
 	// Send echo response
-	resp := internal.NewSuccessResponse(req.ID, map[string]interface{}{
+	resp := protocol.NewSuccessResponse(req.ID, map[string]interface{}{
 		"echo":        text,
 		"text_length": len(text),
 	})
 
 	msg, err := json.Marshal(resp)
 	if err != nil {
-		internal.Error("SelfReplyHandler: Marshal error", zap.Error(err))
-		errResp := internal.NewErrorResponse(
+		observability.Error("SelfReplyHandler: Marshal error", zap.Error(err))
+		errResp := protocol.NewErrorResponse(
 			req.ID,
-			internal.InternalError,
+			protocol.InternalError,
 			"Internal error",
 			map[string]string{"detail": err.Error()},
 		)

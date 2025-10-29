@@ -1,10 +1,29 @@
-package internal
+package protocol
 
 import (
 	"encoding/json"
+	"os"
 	"testing"
 	"time"
+
+	"nbio-websocket/internal/core"
+	"nbio-websocket/internal/observability"
 )
+
+// TestMain initializes logger before running tests
+func TestMain(m *testing.M) {
+	cfg := &observability.LogConfig{
+		Level:  "error", // Minimal logging in tests
+		Format: "text",
+	}
+	if err := observability.InitLogger(cfg); err != nil {
+		panic(err)
+	}
+
+	code := m.Run()
+	observability.Sync()
+	os.Exit(code)
+}
 
 func TestNewRouter(t *testing.T) {
 	router := NewRouter()
@@ -21,7 +40,7 @@ func TestNewRouter(t *testing.T) {
 func TestRouterRegisterHandler(t *testing.T) {
 	router := NewRouter()
 
-	handler := func(client *Client, req *JsonRPCRequest) {
+	handler := func(client *core.Client, req *JsonRPCRequest) {
 		// Test handler
 	}
 
@@ -35,18 +54,15 @@ func TestRouterRegisterHandler(t *testing.T) {
 
 func TestRouterHandleInvalidJSON(t *testing.T) {
 	router := NewRouter()
-	hub := NewHub()
-	client := &Client{
-		hub:  hub,
-		send: make(chan []byte, 1),
-	}
+	hub := core.NewHub()
+	client := core.NewTestClient(hub, 1)
 
 	// Send invalid JSON
 	router.Handle(client, []byte("{invalid json"))
 
 	// Should receive error response
 	select {
-	case response := <-client.send:
+	case response := <-client.GetSendChannel():
 		var resp JsonRPCResponse
 		if err := json.Unmarshal(response, &resp); err != nil {
 			t.Fatalf("Failed to unmarshal error response: %v", err)
@@ -67,11 +83,8 @@ func TestRouterHandleInvalidJSON(t *testing.T) {
 
 func TestRouterHandleInvalidVersion(t *testing.T) {
 	router := NewRouter()
-	hub := NewHub()
-	client := &Client{
-		hub:  hub,
-		send: make(chan []byte, 1),
-	}
+	hub := core.NewHub()
+	client := core.NewTestClient(hub, 1)
 
 	// Send request with wrong JSON-RPC version
 	req := map[string]interface{}{
@@ -85,7 +98,7 @@ func TestRouterHandleInvalidVersion(t *testing.T) {
 
 	// Should receive error response
 	select {
-	case response := <-client.send:
+	case response := <-client.GetSendChannel():
 		var resp JsonRPCResponse
 		if err := json.Unmarshal(response, &resp); err != nil {
 			t.Fatalf("Failed to unmarshal error response: %v", err)
@@ -106,11 +119,8 @@ func TestRouterHandleInvalidVersion(t *testing.T) {
 
 func TestRouterHandleEmptyMethod(t *testing.T) {
 	router := NewRouter()
-	hub := NewHub()
-	client := &Client{
-		hub:  hub,
-		send: make(chan []byte, 1),
-	}
+	hub := core.NewHub()
+	client := core.NewTestClient(hub, 1)
 
 	// Send request with empty method
 	req := JsonRPCRequest{
@@ -124,7 +134,7 @@ func TestRouterHandleEmptyMethod(t *testing.T) {
 
 	// Should receive error response
 	select {
-	case response := <-client.send:
+	case response := <-client.GetSendChannel():
 		var resp JsonRPCResponse
 		if err := json.Unmarshal(response, &resp); err != nil {
 			t.Fatalf("Failed to unmarshal error response: %v", err)
@@ -145,11 +155,8 @@ func TestRouterHandleEmptyMethod(t *testing.T) {
 
 func TestRouterHandleMethodNotFound(t *testing.T) {
 	router := NewRouter()
-	hub := NewHub()
-	client := &Client{
-		hub:  hub,
-		send: make(chan []byte, 1),
-	}
+	hub := core.NewHub()
+	client := core.NewTestClient(hub, 1)
 
 	// Send request with unregistered method
 	req := JsonRPCRequest{
@@ -163,7 +170,7 @@ func TestRouterHandleMethodNotFound(t *testing.T) {
 
 	// Should receive error response
 	select {
-	case response := <-client.send:
+	case response := <-client.GetSendChannel():
 		var resp JsonRPCResponse
 		if err := json.Unmarshal(response, &resp); err != nil {
 			t.Fatalf("Failed to unmarshal error response: %v", err)
@@ -184,21 +191,17 @@ func TestRouterHandleMethodNotFound(t *testing.T) {
 
 func TestRouterHandleSuccess(t *testing.T) {
 	router := NewRouter()
-	hub := NewHub()
-	client := &Client{
-		hub:  hub,
-		send: make(chan []byte, 1),
-	}
+	hub := core.NewHub()
+	client := core.NewTestClient(hub, 1)
 
 	// Register test handler
 	handlerCalled := false
-	router.Register("test", func(c *Client, req *JsonRPCRequest) {
+	router.Register("test", func(c *core.Client, req *JsonRPCRequest) {
 		handlerCalled = true
 
 		// Send success response
 		resp := NewSuccessResponse(req.ID, map[string]string{"result": "ok"})
-		msg, _ := json.Marshal(resp)
-		c.send <- msg
+		c.SendJSON(resp)
 	})
 
 	// Send valid request
@@ -219,7 +222,7 @@ func TestRouterHandleSuccess(t *testing.T) {
 
 	// Should receive success response
 	select {
-	case response := <-client.send:
+	case response := <-client.GetSendChannel():
 		var resp JsonRPCResponse
 		if err := json.Unmarshal(response, &resp); err != nil {
 			t.Fatalf("Failed to unmarshal response: %v", err)
@@ -240,14 +243,11 @@ func TestRouterHandleSuccess(t *testing.T) {
 
 func TestRouterHandlePanic(t *testing.T) {
 	router := NewRouter()
-	hub := NewHub()
-	client := &Client{
-		hub:  hub,
-		send: make(chan []byte, 1),
-	}
+	hub := core.NewHub()
+	client := core.NewTestClient(hub, 1)
 
 	// Register handler that panics
-	router.Register("panic", func(c *Client, req *JsonRPCRequest) {
+	router.Register("panic", func(c *core.Client, req *JsonRPCRequest) {
 		panic("test panic")
 	})
 
@@ -263,7 +263,7 @@ func TestRouterHandlePanic(t *testing.T) {
 
 	// Should receive error response (panic recovered)
 	select {
-	case response := <-client.send:
+	case response := <-client.GetSendChannel():
 		var resp JsonRPCResponse
 		if err := json.Unmarshal(response, &resp); err != nil {
 			t.Fatalf("Failed to unmarshal error response: %v", err)

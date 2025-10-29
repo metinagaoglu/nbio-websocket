@@ -1,4 +1,4 @@
-package internal
+package core
 
 import (
 	"encoding/json"
@@ -7,6 +7,8 @@ import (
 
 	"github.com/lesismal/nbio/nbhttp/websocket"
 	"go.uber.org/zap"
+
+	"nbio-websocket/internal/observability"
 )
 
 type Client struct {
@@ -24,6 +26,21 @@ func NewClient(hub *Hub, conn *websocket.Conn, bufferSize int) *Client {
 		send: make(chan []byte, bufferSize), // ✅ Configurable buffer size
 		done: make(chan struct{}),
 	}
+}
+
+// NewTestClient creates a client for testing purposes (without conn requirement)
+func NewTestClient(hub *Hub, bufferSize int) *Client {
+	return &Client{
+		hub:  hub,
+		conn: nil, // No real connection for testing
+		send: make(chan []byte, bufferSize),
+		done: make(chan struct{}),
+	}
+}
+
+// GetSendChannel returns the send channel for testing purposes
+func (c *Client) GetSendChannel() <-chan []byte {
+	return c.send
 }
 
 func (c *Client) Hub() *Hub {
@@ -61,7 +78,7 @@ func (c *Client) Send(msg []byte) error {
 func (c *Client) SendJSON(v interface{}) error {
 	msg, err := json.Marshal(v)
 	if err != nil {
-		Error("Failed to marshal JSON", zap.Error(err))
+		observability.Error("Failed to marshal JSON", zap.Error(err))
 		return err
 	}
 	return c.Send(msg)

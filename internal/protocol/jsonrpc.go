@@ -1,4 +1,4 @@
-package internal
+package protocol
 
 // JsonRPCRequest represents a JSON-RPC 2.0 request
 type JsonRPCRequest struct {

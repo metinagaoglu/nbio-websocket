@@ -1,24 +1,26 @@
-package internal
+package core
 
 import (
 	"context"
 	"os"
 	"testing"
 	"time"
+
+	"nbio-websocket/internal/observability"
 )
 
 // TestMain initializes logger before running tests
 func TestMain(m *testing.M) {
-	cfg := &LogConfig{
+	cfg := &observability.LogConfig{
 		Level:  "error", // Minimal logging in tests
 		Format: "text",
 	}
-	if err := InitLogger(cfg); err != nil {
+	if err := observability.InitLogger(cfg); err != nil {
 		panic(err)
 	}
 
 	code := m.Run()
-	Sync()
+	observability.Sync()
 	os.Exit(code)
 }
 

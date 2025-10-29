@@ -1,13 +1,16 @@
-package internal
+package protocol
 
 import (
 	"encoding/json"
 	"fmt"
 
 	"go.uber.org/zap"
+
+	"nbio-websocket/internal/core"
+	"nbio-websocket/internal/observability"
 )
 
-type HandlerFunc func(*Client, *JsonRPCRequest)
+type HandlerFunc func(*core.Client, *JsonRPCRequest)
 
 type Router struct {
 	handlers map[string]HandlerFunc
@@ -22,13 +25,13 @@ func (r *Router) Register(event string, handler HandlerFunc) {
 }
 
 // Handle processes incoming JSON-RPC messages with comprehensive validation
-func (r *Router) Handle(client *Client, msg []byte) {
+func (r *Router) Handle(client *core.Client, msg []byte) {
 	var req JsonRPCRequest
-	GetMetrics().IncrementMessagesReceived()
+	observability.GetMetrics().IncrementMessagesReceived()
 
 	// Step 1: Parse JSON
 	if err := json.Unmarshal(msg, &req); err != nil {
-		GetMetrics().IncrementParseErrors()
+		observability.GetMetrics().IncrementParseErrors()
 		resp := NewErrorResponse(nil, ParseError, "Parse error", map[string]string{
 			"detail": err.Error(),
 		})
@@ -68,8 +71,8 @@ func (r *Router) Handle(client *Client, msg []byte) {
 	func() {
 		defer func() {
 			if panicErr := recover(); panicErr != nil {
-				GetMetrics().IncrementHandlerPanics()
-				Error("Panic in handler",
+				observability.GetMetrics().IncrementHandlerPanics()
+				observability.Error("Panic in handler",
 					zap.String("method", req.Method),
 					zap.Any("panic", panicErr),
 				)
@@ -85,14 +88,14 @@ func (r *Router) Handle(client *Client, msg []byte) {
 }
 
 // sendResponse marshals and sends a JSON-RPC response to the client
-func (router *Router) sendResponse(client *Client, resp *JsonRPCResponse) {
+func (router *Router) sendResponse(client *core.Client, resp *JsonRPCResponse) {
 	msg, err := json.Marshal(resp)
 	if err != nil {
-		Error("Failed to marshal response", zap.Error(err))
+		observability.Error("Failed to marshal response", zap.Error(err))
 		return
 	}
 
 	if err := client.Send(msg); err != nil {
-		Debug("Failed to send response", zap.Error(err))
+		observability.Debug("Failed to send response", zap.Error(err))
 	}
 }

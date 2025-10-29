@@ -5,17 +5,19 @@ import (
 
 	"go.uber.org/zap"
 
-	"nbio-websocket/internal"
+	"nbio-websocket/internal/core"
+	"nbio-websocket/internal/observability"
+	"nbio-websocket/internal/protocol"
 )
 
 // BroadcastHandler: Gelen mesajı tüm clientlara iletir.
-func BroadcastHandler(client *internal.Client, req *internal.JsonRPCRequest) {
+func BroadcastHandler(client *core.Client, req *protocol.JsonRPCRequest) {
 	// Validate params
 	params, ok := req.Params.(map[string]interface{})
 	if !ok {
-		sendErrorResponse(client, internal.NewErrorResponse(
+		sendErrorResponse(client, protocol.NewErrorResponse(
 			req.ID,
-			internal.InvalidParams,
+			protocol.InvalidParams,
 			"Invalid params",
 			map[string]string{"expected": "object"},
 		))
@@ -25,9 +27,9 @@ func BroadcastHandler(client *internal.Client, req *internal.JsonRPCRequest) {
 	// Validate required fields
 	text, ok := params["text"].(string)
 	if !ok || text == "" {
-		sendErrorResponse(client, internal.NewErrorResponse(
+		sendErrorResponse(client, protocol.NewErrorResponse(
 			req.ID,
-			internal.InvalidParams,
+			protocol.InvalidParams,
 			"Invalid params",
 			map[string]string{"detail": "text field is required and must be a non-empty string"},
 		))
@@ -37,10 +39,10 @@ func BroadcastHandler(client *internal.Client, req *internal.JsonRPCRequest) {
 	// Marshal request for broadcasting
 	msg, err := json.Marshal(req)
 	if err != nil {
-		internal.Error("BroadcastHandler: Marshal error", zap.Error(err))
-		sendErrorResponse(client, internal.NewErrorResponse(
+		observability.Error("BroadcastHandler: Marshal error", zap.Error(err))
+		sendErrorResponse(client, protocol.NewErrorResponse(
 			req.ID,
-			internal.InternalError,
+			protocol.InternalError,
 			"Internal error",
 			map[string]string{"detail": err.Error()},
 		))
@@ -51,7 +53,7 @@ func BroadcastHandler(client *internal.Client, req *internal.JsonRPCRequest) {
 	client.Hub().Broadcast() <- msg
 
 	// Send success response to sender
-	resp := internal.NewSuccessResponse(req.ID, map[string]interface{}{
+	resp := protocol.NewSuccessResponse(req.ID, map[string]interface{}{
 		"status":      "broadcasted",
 		"text_length": len(text),
 	})
@@ -59,20 +61,20 @@ func BroadcastHandler(client *internal.Client, req *internal.JsonRPCRequest) {
 }
 
 // sendErrorResponse sends an error response to the client
-func sendErrorResponse(client *internal.Client, resp *internal.JsonRPCResponse) {
+func sendErrorResponse(client *core.Client, resp *protocol.JsonRPCResponse) {
 	msg, err := json.Marshal(resp)
 	if err != nil {
-		internal.Error("Failed to marshal error response", zap.Error(err))
+		observability.Error("Failed to marshal error response", zap.Error(err))
 		return
 	}
 	client.Send(msg)
 }
 
 // sendSuccessResponse sends a success response to the client
-func sendSuccessResponse(client *internal.Client, resp *internal.JsonRPCResponse) {
+func sendSuccessResponse(client *core.Client, resp *protocol.JsonRPCResponse) {
 	msg, err := json.Marshal(resp)
 	if err != nil {
-		internal.Error("Failed to marshal success response", zap.Error(err))
+		observability.Error("Failed to marshal success response", zap.Error(err))
 		return
 	}
 	client.Send(msg)
