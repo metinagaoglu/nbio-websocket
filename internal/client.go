@@ -1,10 +1,12 @@
 package internal
 
 import (
+	"encoding/json"
 	"sync/atomic"
 	"time"
 
 	"github.com/lesismal/nbio/nbhttp/websocket"
+	"go.uber.org/zap"
 )
 
 type Client struct {
@@ -53,6 +55,16 @@ func (c *Client) Send(msg []byte) error {
 		// Buffer full, client too slow
 		return nil
 	}
+}
+
+// SendJSON marshals and sends a JSON response to the client
+func (c *Client) SendJSON(v interface{}) error {
+	msg, err := json.Marshal(v)
+	if err != nil {
+		Error("Failed to marshal JSON", zap.Error(err))
+		return err
+	}
+	return c.Send(msg)
 }
 
 // WritePump handles sending messages to the WebSocket connection

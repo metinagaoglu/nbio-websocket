@@ -3,7 +3,8 @@ package internal
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+
+	"go.uber.org/zap"
 )
 
 type HandlerFunc func(*Client, *JsonRPCRequest)
@@ -23,9 +24,11 @@ func (r *Router) Register(event string, handler HandlerFunc) {
 // Handle processes incoming JSON-RPC messages with comprehensive validation
 func (r *Router) Handle(client *Client, msg []byte) {
 	var req JsonRPCRequest
+	GetMetrics().IncrementMessagesReceived()
 
 	// Step 1: Parse JSON
 	if err := json.Unmarshal(msg, &req); err != nil {
+		GetMetrics().IncrementParseErrors()
 		resp := NewErrorResponse(nil, ParseError, "Parse error", map[string]string{
 			"detail": err.Error(),
 		})
@@ -65,7 +68,11 @@ func (r *Router) Handle(client *Client, msg []byte) {
 	func() {
 		defer func() {
 			if panicErr := recover(); panicErr != nil {
-				log.Printf("Panic in handler '%s': %v", req.Method, panicErr)
+				GetMetrics().IncrementHandlerPanics()
+				Error("Panic in handler",
+					zap.String("method", req.Method),
+					zap.Any("panic", panicErr),
+				)
 				resp := NewErrorResponse(req.ID, InternalError, "Internal error", map[string]interface{}{
 					"panic": fmt.Sprintf("%v", panicErr),
 				})
@@ -81,11 +88,11 @@ func (r *Router) Handle(client *Client, msg []byte) {
 func (router *Router) sendResponse(client *Client, resp *JsonRPCResponse) {
 	msg, err := json.Marshal(resp)
 	if err != nil {
-		log.Printf("Failed to marshal response: %v", err)
+		Error("Failed to marshal response", zap.Error(err))
 		return
 	}
 
 	if err := client.Send(msg); err != nil {
-		log.Printf("Failed to send response: %v", err)
+		Debug("Failed to send response", zap.Error(err))
 	}
 }

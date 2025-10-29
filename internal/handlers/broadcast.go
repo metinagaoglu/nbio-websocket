@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"encoding/json"
-	"log"
+
+	"go.uber.org/zap"
+
 	"nbio-websocket/internal"
 )
 
@@ -35,7 +37,7 @@ func BroadcastHandler(client *internal.Client, req *internal.JsonRPCRequest) {
 	// Marshal request for broadcasting
 	msg, err := json.Marshal(req)
 	if err != nil {
-		log.Printf("BroadcastHandler: Marshal error: %v", err)
+		internal.Error("BroadcastHandler: Marshal error", zap.Error(err))
 		sendErrorResponse(client, internal.NewErrorResponse(
 			req.ID,
 			internal.InternalError,
@@ -60,7 +62,7 @@ func BroadcastHandler(client *internal.Client, req *internal.JsonRPCRequest) {
 func sendErrorResponse(client *internal.Client, resp *internal.JsonRPCResponse) {
 	msg, err := json.Marshal(resp)
 	if err != nil {
-		log.Printf("Failed to marshal error response: %v", err)
+		internal.Error("Failed to marshal error response", zap.Error(err))
 		return
 	}
 	client.Send(msg)
@@ -70,7 +72,7 @@ func sendErrorResponse(client *internal.Client, resp *internal.JsonRPCResponse) 
 func sendSuccessResponse(client *internal.Client, resp *internal.JsonRPCResponse) {
 	msg, err := json.Marshal(resp)
 	if err != nil {
-		log.Printf("Failed to marshal success response: %v", err)
+		internal.Error("Failed to marshal success response", zap.Error(err))
 		return
 	}
 	client.Send(msg)

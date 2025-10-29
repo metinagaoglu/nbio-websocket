@@ -4,14 +4,16 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
 // Config holds all configuration for the WebSocket server
 type Config struct {
-	Server ServerConfig
-	Client ClientConfig
-	Log    LogConfig
+	Server   ServerConfig
+	Client   ClientConfig
+	Log      LogConfig
+	Security SecurityConfig
 }
 
 // ServerConfig contains server-specific settings
@@ -36,6 +38,21 @@ type LogConfig struct {
 	Format string // text, json
 }
 
+// SecurityConfig contains security settings
+type SecurityConfig struct {
+	AuthEnabled        bool
+	BearerTokens       []string
+	RateLimitEnabled   bool
+	RateLimitRate      int           // requests per interval
+	RateLimitInterval  time.Duration // interval for rate limit
+	RateLimitBurst     int           // max burst size
+	TLSEnabled         bool
+	TLSCertFile        string
+	TLSKeyFile         string
+	MaxMessageSize     int64 // Maximum message size in bytes
+	AllowedOrigins     []string
+}
+
 // DefaultConfig returns configuration with sensible defaults
 func DefaultConfig() *Config {
 	return &Config{
@@ -54,6 +71,19 @@ func DefaultConfig() *Config {
 		Log: LogConfig{
 			Level:  "info",
 			Format: "text",
+		},
+		Security: SecurityConfig{
+			AuthEnabled:       false,
+			BearerTokens:      []string{},
+			RateLimitEnabled:  false,
+			RateLimitRate:     100,               // 100 requests
+			RateLimitInterval: 1 * time.Minute,   // per minute
+			RateLimitBurst:    10,                // burst of 10
+			TLSEnabled:        false,
+			TLSCertFile:       "",
+			TLSKeyFile:        "",
+			MaxMessageSize:    1024 * 1024,       // 1MB
+			AllowedOrigins:    []string{"*"},
 		},
 	}
 }
@@ -117,6 +147,54 @@ func LoadConfig() *Config {
 
 	if format := os.Getenv("WS_LOG_FORMAT"); format != "" {
 		cfg.Log.Format = format
+	}
+
+	// Security configuration
+	if authEnabledStr := os.Getenv("WS_AUTH_ENABLED"); authEnabledStr != "" {
+		cfg.Security.AuthEnabled = authEnabledStr == "true" || authEnabledStr == "1"
+	}
+
+	if tokens := os.Getenv("WS_BEARER_TOKENS"); tokens != "" {
+		cfg.Security.BearerTokens = []string{}
+		for _, token := range strings.Split(tokens, ",") {
+			if t := strings.TrimSpace(token); t != "" {
+				cfg.Security.BearerTokens = append(cfg.Security.BearerTokens, t)
+			}
+		}
+	}
+
+	if rateLimitEnabledStr := os.Getenv("WS_RATE_LIMIT_ENABLED"); rateLimitEnabledStr != "" {
+		cfg.Security.RateLimitEnabled = rateLimitEnabledStr == "true" || rateLimitEnabledStr == "1"
+	}
+
+	if rateStr := os.Getenv("WS_RATE_LIMIT_RATE"); rateStr != "" {
+		if rate, err := strconv.Atoi(rateStr); err == nil {
+			cfg.Security.RateLimitRate = rate
+		}
+	}
+
+	if intervalStr := os.Getenv("WS_RATE_LIMIT_INTERVAL"); intervalStr != "" {
+		if interval, err := time.ParseDuration(intervalStr); err == nil {
+			cfg.Security.RateLimitInterval = interval
+		}
+	}
+
+	if burstStr := os.Getenv("WS_RATE_LIMIT_BURST"); burstStr != "" {
+		if burst, err := strconv.Atoi(burstStr); err == nil {
+			cfg.Security.RateLimitBurst = burst
+		}
+	}
+
+	if tlsEnabledStr := os.Getenv("WS_TLS_ENABLED"); tlsEnabledStr != "" {
+		cfg.Security.TLSEnabled = tlsEnabledStr == "true" || tlsEnabledStr == "1"
+	}
+
+	if certFile := os.Getenv("WS_TLS_CERT"); certFile != "" {
+		cfg.Security.TLSCertFile = certFile
+	}
+
+	if keyFile := os.Getenv("WS_TLS_KEY"); keyFile != "" {
+		cfg.Security.TLSKeyFile = keyFile
 	}
 
 	return cfg

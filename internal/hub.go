@@ -2,8 +2,9 @@ package internal
 
 import (
 	"context"
-	"log"
 	"sync"
+
+	"go.uber.org/zap"
 )
 
 type Hub struct {
@@ -32,52 +33,61 @@ func NewHub() *Hub {
 }
 
 func (h *Hub) Run(ctx context.Context) {
-	log.Println("Hub: Started")
+	Info("Hub started")
 
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("Hub: Shutdown signal received")
+			Info("Hub shutdown initiated")
 			h.closeAllClients()
-			log.Println("Hub: All clients closed")
+			Info("Hub shutdown complete")
 			return
 
 		case client := <-h.register:
 			h.mu.Lock()
 			h.clients[client] = true
-			h.connToClient[client.conn] = client // ✅ Add reverse mapping
+			h.connToClient[client.conn] = client
 			count := len(h.clients)
 			h.mu.Unlock()
-			log.Printf("Hub: Client registered (total: %d)", count)
+			GetMetrics().IncrementConnections()
+			Info("Client registered",
+				zap.Int("total_clients", count),
+			)
 
 		case client := <-h.unregister:
 			h.mu.Lock()
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
-				delete(h.connToClient, client.conn) // ✅ Remove reverse mapping
+				delete(h.connToClient, client.conn)
 				close(client.send)
 				count := len(h.clients)
-				log.Printf("Hub: Client unregistered (remaining: %d)", count)
+				GetMetrics().IncrementDisconnects()
+				Info("Client unregistered",
+					zap.Int("remaining_clients", count),
+				)
 			}
 			h.mu.Unlock()
 
 		case client := <-h.disconnected:
-			// ✅ NEW CASE: Handle cleanup from failed sends
 			h.mu.Lock()
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
-				delete(h.connToClient, client.conn) // ✅ Remove reverse mapping
+				delete(h.connToClient, client.conn)
 				close(client.send)
-				log.Printf("Hub: Client disconnected due to send failure")
+				GetMetrics().IncrementDisconnects()
+				Warn("Client disconnected due to send failure")
 			}
 			h.mu.Unlock()
 
 		case message := <-h.broadcast:
+			GetMetrics().IncrementBroadcasts()
 			h.mu.RLock()
+			clientCount := 0
 			for client := range h.clients {
 				select {
 				case client.send <- message:
 					// ✅ Message sent successfully
+					clientCount++
 				default:
 					// ✅ FIXED: Signal cleanup instead of direct delete under RLock
 					go func(c *Client) {
@@ -86,6 +96,10 @@ func (h *Hub) Run(ctx context.Context) {
 				}
 			}
 			h.mu.RUnlock()
+			// Track actual messages sent
+			for i := 0; i < clientCount; i++ {
+				GetMetrics().IncrementMessagesSent()
+			}
 		}
 	}
 }
@@ -106,11 +120,10 @@ func (h *Hub) closeAllClients() {
 	count := len(h.clients)
 	for client := range h.clients {
 		close(client.send)
-		// Note: client.Close() will be available after Task 1.3
 	}
 
 	// Clear maps
 	h.clients = make(map[*Client]bool)
 	h.connToClient = make(map[interface{}]*Client)
-	log.Printf("Hub: Closed %d clients", count)
+	Info("Closed all clients", zap.Int("count", count))
 }

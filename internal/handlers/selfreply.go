@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"encoding/json"
-	"log"
+
+	"go.uber.org/zap"
+
 	"nbio-websocket/internal"
 )
 
@@ -42,7 +44,7 @@ func SelfReplyHandler(client *internal.Client, req *internal.JsonRPCRequest) {
 
 	msg, err := json.Marshal(resp)
 	if err != nil {
-		log.Printf("SelfReplyHandler: Marshal error: %v", err)
+		internal.Error("SelfReplyHandler: Marshal error", zap.Error(err))
 		errResp := internal.NewErrorResponse(
 			req.ID,
 			internal.InternalError,
