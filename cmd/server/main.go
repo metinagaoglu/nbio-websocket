@@ -13,6 +13,7 @@ import (
 	"nbio-websocket/internal/handlers"
 	"nbio-websocket/internal/observability"
 	"nbio-websocket/internal/protocol"
+	"nbio-websocket/internal/pubsub"
 	"nbio-websocket/internal/security"
 	"nbio-websocket/internal/transport"
 )
@@ -46,6 +47,8 @@ func main() {
 		zap.Bool("auth_enabled", cfg.Security.AuthEnabled),
 		zap.Bool("rate_limit_enabled", cfg.Security.RateLimitEnabled),
 		zap.Bool("tls_enabled", cfg.Security.TLSEnabled),
+		zap.Bool("pubsub_enabled", cfg.PubSub.Enabled),
+		zap.String("pubsub_adapter", cfg.PubSub.Adapter),
 	)
 
 	// Create context with cancellation for graceful shutdown
@@ -58,6 +61,31 @@ func main() {
 
 	// Create hub and start with context
 	hub := core.NewHub()
+
+	// Initialize PubSub adapter if enabled
+	if cfg.PubSub.Enabled {
+		adapterConfig := map[string]string{}
+		switch cfg.PubSub.Adapter {
+		case "redis":
+			adapterConfig["url"] = cfg.PubSub.RedisURL
+		case "nats":
+			adapterConfig["url"] = cfg.PubSub.NATSURL
+		}
+
+		adapter, err := pubsub.NewAdapter(pubsub.AdapterType(cfg.PubSub.Adapter), adapterConfig)
+		if err != nil {
+			observability.Fatal("Failed to create PubSub adapter", zap.Error(err))
+		}
+
+		if err := hub.SetPubSub(ctx, adapter, cfg.PubSub.Channel); err != nil {
+			observability.Fatal("Failed to initialize PubSub", zap.Error(err))
+		}
+
+		observability.Info("PubSub scaling enabled",
+			zap.String("adapter", cfg.PubSub.Adapter),
+			zap.String("channel", cfg.PubSub.Channel))
+	}
+
 	go hub.Run(ctx)
 
 	// Setup router

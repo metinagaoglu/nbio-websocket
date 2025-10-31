@@ -16,6 +16,7 @@ type Config struct {
 	Client   ClientConfig
 	Log      observability.LogConfig
 	Security SecurityConfig
+	PubSub   PubSubConfig
 }
 
 // ServerConfig contains server-specific settings
@@ -50,6 +51,15 @@ type SecurityConfig struct {
 	AllowedOrigins     []string
 }
 
+// PubSubConfig contains pub/sub adapter settings for horizontal scaling
+type PubSubConfig struct {
+	Enabled  bool              // Enable pub/sub for multi-instance scaling
+	Adapter  string            // Adapter type: "local", "redis", "nats"
+	RedisURL string            // Redis connection URL (redis://host:port/db)
+	NATSURL  string            // NATS connection URL (nats://host:port)
+	Channel  string            // Channel/subject name for broadcasting
+}
+
 // DefaultConfig returns configuration with sensible defaults
 func DefaultConfig() *Config {
 	return &Config{
@@ -81,6 +91,13 @@ func DefaultConfig() *Config {
 			TLSKeyFile:        "",
 			MaxMessageSize:    1024 * 1024,       // 1MB
 			AllowedOrigins:    []string{"*"},
+		},
+		PubSub: PubSubConfig{
+			Enabled:  false,
+			Adapter:  "local",
+			RedisURL: "redis://localhost:6379/0",
+			NATSURL:  "nats://localhost:4222",
+			Channel:  "websocket.broadcast",
 		},
 	}
 }
@@ -194,6 +211,27 @@ func LoadConfig() *Config {
 		cfg.Security.TLSKeyFile = keyFile
 	}
 
+	// PubSub configuration
+	if pubsubEnabledStr := os.Getenv("WS_PUBSUB_ENABLED"); pubsubEnabledStr != "" {
+		cfg.PubSub.Enabled = pubsubEnabledStr == "true" || pubsubEnabledStr == "1"
+	}
+
+	if adapter := os.Getenv("WS_PUBSUB_ADAPTER"); adapter != "" {
+		cfg.PubSub.Adapter = adapter
+	}
+
+	if redisURL := os.Getenv("WS_REDIS_URL"); redisURL != "" {
+		cfg.PubSub.RedisURL = redisURL
+	}
+
+	if natsURL := os.Getenv("WS_NATS_URL"); natsURL != "" {
+		cfg.PubSub.NATSURL = natsURL
+	}
+
+	if channel := os.Getenv("WS_PUBSUB_CHANNEL"); channel != "" {
+		cfg.PubSub.Channel = channel
+	}
+
 	return cfg
 }
 
@@ -228,6 +266,26 @@ func (c *Config) Validate() error {
 	validFormats := map[string]bool{"text": true, "json": true}
 	if !validFormats[c.Log.Format] {
 		return fmt.Errorf("invalid log format: %s (must be text or json)", c.Log.Format)
+	}
+
+	// PubSub validation
+	if c.PubSub.Enabled {
+		validAdapters := map[string]bool{"local": true, "redis": true, "nats": true}
+		if !validAdapters[c.PubSub.Adapter] {
+			return fmt.Errorf("invalid pubsub adapter: %s (must be local, redis, or nats)", c.PubSub.Adapter)
+		}
+
+		if c.PubSub.Adapter == "redis" && c.PubSub.RedisURL == "" {
+			return fmt.Errorf("redis adapter requires WS_REDIS_URL to be set")
+		}
+
+		if c.PubSub.Adapter == "nats" && c.PubSub.NATSURL == "" {
+			return fmt.Errorf("nats adapter requires WS_NATS_URL to be set")
+		}
+
+		if c.PubSub.Channel == "" {
+			return fmt.Errorf("pubsub channel cannot be empty")
+		}
 	}
 
 	return nil

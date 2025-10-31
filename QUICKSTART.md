@@ -66,6 +66,11 @@ export WS_RATE_LIMIT_ENABLED=true
 # Logging
 export WS_LOG_LEVEL=info
 export WS_LOG_FORMAT=json
+
+# Horizontal Scaling (optional)
+export WS_PUBSUB_ENABLED=true
+export WS_PUBSUB_ADAPTER=redis  # Options: local, redis, nats
+export WS_REDIS_URL=redis://localhost:6379/0
 ```
 
 See `docker/docker-compose.yml` for complete list.
@@ -189,7 +194,9 @@ func (r *Routes) RegisterRoutes(mux *http.ServeMux) {
 
 ## 📚 Documentation
 
-- **Complete Guide**: See `claudedocs/RESTRUCTURING-COMPLETE.md`
+- **Quick Start**: This file
+- **Scaling Guide**: See `claudedocs/SCALING-GUIDE.md`
+- **Restructuring**: See `claudedocs/RESTRUCTURING-COMPLETE.md`
 - **Phase 3 Features**: See `claudedocs/PHASE3-COMPLETE.md`
 - **Docker Guide**: See `docker/README.md`
 - **Implementation Plan**: See `claudedocs/02-implementation-plan.md`
@@ -219,6 +226,43 @@ export WS_TLS_ENABLED=true
 export WS_TLS_CERT=/path/to/cert.pem
 export WS_TLS_KEY=/path/to/key.pem
 ```
+
+## 📈 Horizontal Scaling
+
+Run multiple instances with Redis or NATS for load distribution.
+
+### Quick Start with Redis
+
+```bash
+# Start Redis
+docker run -d --name redis -p 6379:6379 redis:7-alpine
+
+# Start multiple instances
+WS_PUBSUB_ENABLED=true WS_PUBSUB_ADAPTER=redis \
+WS_REDIS_URL=redis://localhost:6379/0 WS_PORT=8080 ./bin/nbio-ws &
+
+WS_PUBSUB_ENABLED=true WS_PUBSUB_ADAPTER=redis \
+WS_REDIS_URL=redis://localhost:6379/0 WS_PORT=8081 ./bin/nbio-ws &
+
+# Messages broadcast to all instances
+```
+
+### Docker Compose Scaling
+
+```bash
+# Use the scaling configuration
+cd docker
+docker-compose -f docker-compose.scale.yml up -d redis
+docker-compose -f docker-compose.scale.yml up -d --scale websocket=3
+```
+
+### Adapters
+
+- **local**: Single instance (default)
+- **redis**: Multiple instances with Redis pub/sub
+- **nats**: Multiple instances with NATS pub/sub
+
+See `claudedocs/SCALING-GUIDE.md` for complete documentation.
 
 ## 🚨 Troubleshooting
 
