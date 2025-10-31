@@ -35,29 +35,28 @@ type ClientConfig struct {
 	MaxMessageSize int64
 }
 
-
 // SecurityConfig contains security settings
 type SecurityConfig struct {
-	AuthEnabled        bool
-	BearerTokens       []string
-	RateLimitEnabled   bool
-	RateLimitRate      int           // requests per interval
-	RateLimitInterval  time.Duration // interval for rate limit
-	RateLimitBurst     int           // max burst size
-	TLSEnabled         bool
-	TLSCertFile        string
-	TLSKeyFile         string
-	MaxMessageSize     int64 // Maximum message size in bytes
-	AllowedOrigins     []string
+	AuthEnabled       bool
+	BearerTokens      []string
+	RateLimitEnabled  bool
+	RateLimitRate     int           // requests per interval
+	RateLimitInterval time.Duration // interval for rate limit
+	RateLimitBurst    int           // max burst size
+	TLSEnabled        bool
+	TLSCertFile       string
+	TLSKeyFile        string
+	MaxMessageSize    int64 // Maximum message size in bytes
+	AllowedOrigins    []string
 }
 
 // PubSubConfig contains pub/sub adapter settings for horizontal scaling
 type PubSubConfig struct {
-	Enabled  bool              // Enable pub/sub for multi-instance scaling
-	Adapter  string            // Adapter type: "local", "redis", "nats"
-	RedisURL string            // Redis connection URL (redis://host:port/db)
-	NATSURL  string            // NATS connection URL (nats://host:port)
-	Channel  string            // Channel/subject name for broadcasting
+	Enabled  bool   // Enable pub/sub for multi-instance scaling
+	Adapter  string // Adapter type: "local", "redis", "nats"
+	RedisURL string // Redis connection URL (redis://host:port/db)
+	NATSURL  string // NATS connection URL (nats://host:port)
+	Channel  string // Channel/subject name for broadcasting
 }
 
 // DefaultConfig returns configuration with sensible defaults
@@ -83,13 +82,13 @@ func DefaultConfig() *Config {
 			AuthEnabled:       false,
 			BearerTokens:      []string{},
 			RateLimitEnabled:  false,
-			RateLimitRate:     100,               // 100 requests
-			RateLimitInterval: 1 * time.Minute,   // per minute
-			RateLimitBurst:    10,                // burst of 10
+			RateLimitRate:     100,             // 100 requests
+			RateLimitInterval: 1 * time.Minute, // per minute
+			RateLimitBurst:    10,              // burst of 10
 			TLSEnabled:        false,
 			TLSCertFile:       "",
 			TLSKeyFile:        "",
-			MaxMessageSize:    1024 * 1024,       // 1MB
+			MaxMessageSize:    1024 * 1024, // 1MB
 			AllowedOrigins:    []string{"*"},
 		},
 		PubSub: PubSubConfig{

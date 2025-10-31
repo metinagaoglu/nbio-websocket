@@ -11,17 +11,17 @@ import (
 
 // Metrics holds server performance metrics
 type Metrics struct {
-	startTime          time.Time
-	connectedClients   atomic.Int64
-	totalConnections   atomic.Uint64
-	totalDisconnects   atomic.Uint64
-	messagesSent       atomic.Uint64
-	messagesReceived   atomic.Uint64
-	broadcastsSent     atomic.Uint64
-	errorsTotal        atomic.Uint64
-	parseErrors        atomic.Uint64
-	handlerErrors      atomic.Uint64
-	handlerPanics      atomic.Uint64
+	startTime        time.Time
+	connectedClients atomic.Int64
+	totalConnections atomic.Uint64
+	totalDisconnects atomic.Uint64
+	messagesSent     atomic.Uint64
+	messagesReceived atomic.Uint64
+	broadcastsSent   atomic.Uint64
+	errorsTotal      atomic.Uint64
+	parseErrors      atomic.Uint64
+	handlerErrors    atomic.Uint64
+	handlerPanics    atomic.Uint64
 }
 
 var serverMetrics *Metrics
@@ -44,18 +44,18 @@ func GetMetrics() *Metrics {
 
 // Snapshot returns current metrics values
 type MetricsSnapshot struct {
-	Uptime            string `json:"uptime"`
-	UptimeSeconds     int64  `json:"uptime_seconds"`
-	ConnectedClients  int64  `json:"connected_clients"`
-	TotalConnections  uint64 `json:"total_connections"`
-	TotalDisconnects  uint64 `json:"total_disconnects"`
-	MessagesSent      uint64 `json:"messages_sent"`
-	MessagesReceived  uint64 `json:"messages_received"`
-	BroadcastsSent    uint64 `json:"broadcasts_sent"`
-	ErrorsTotal       uint64 `json:"errors_total"`
-	ParseErrors       uint64 `json:"parse_errors"`
-	HandlerErrors     uint64 `json:"handler_errors"`
-	HandlerPanics     uint64 `json:"handler_panics"`
+	Uptime            string  `json:"uptime"`
+	UptimeSeconds     int64   `json:"uptime_seconds"`
+	ConnectedClients  int64   `json:"connected_clients"`
+	TotalConnections  uint64  `json:"total_connections"`
+	TotalDisconnects  uint64  `json:"total_disconnects"`
+	MessagesSent      uint64  `json:"messages_sent"`
+	MessagesReceived  uint64  `json:"messages_received"`
+	BroadcastsSent    uint64  `json:"broadcasts_sent"`
+	ErrorsTotal       uint64  `json:"errors_total"`
+	ParseErrors       uint64  `json:"parse_errors"`
+	HandlerErrors     uint64  `json:"handler_errors"`
+	HandlerPanics     uint64  `json:"handler_panics"`
 	MessagesPerSecond float64 `json:"messages_per_second"`
 }
 
@@ -86,7 +86,6 @@ func (m *Metrics) Snapshot() MetricsSnapshot {
 	}
 }
 
-// Client lifecycle metrics
 func (m *Metrics) IncrementConnections() {
 	m.totalConnections.Add(1)
 	m.connectedClients.Add(1)
@@ -97,7 +96,6 @@ func (m *Metrics) IncrementDisconnects() {
 	m.connectedClients.Add(-1)
 }
 
-// Message metrics
 func (m *Metrics) IncrementMessagesSent() {
 	m.messagesSent.Add(1)
 }
@@ -110,7 +108,6 @@ func (m *Metrics) IncrementBroadcasts() {
 	m.broadcastsSent.Add(1)
 }
 
-// Error metrics
 func (m *Metrics) IncrementErrors() {
 	m.errorsTotal.Add(1)
 }

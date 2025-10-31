@@ -23,13 +23,12 @@ type JsonRPCError struct {
 	Data    interface{} `json:"data,omitempty"`
 }
 
-// Standard JSON-RPC 2.0 error codes
 const (
-	ParseError     = -32700 // Invalid JSON
-	InvalidRequest = -32600 // Invalid Request object
-	MethodNotFound = -32601 // Method does not exist
-	InvalidParams  = -32602 // Invalid method parameters
-	InternalError  = -32603 // Internal JSON-RPC error
+	ParseError     = -32700
+	InvalidRequest = -32600
+	MethodNotFound = -32601
+	InvalidParams  = -32602
+	InternalError  = -32603
 )
 
 // NewErrorResponse creates a new error response

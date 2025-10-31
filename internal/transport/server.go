@@ -11,18 +11,13 @@ import (
 	"nbio-websocket/internal/protocol"
 )
 
-// StartServer initializes and starts the WebSocket server with clean routing
 func StartServer(hub *core.Hub, router *protocol.Router, cfg *config.Config) error {
-	// Create routes
 	routes := NewRoutes(hub, router, cfg)
 
-	// Create HTTP multiplexer
 	mux := http.NewServeMux()
 
-	// Register all routes
 	routes.RegisterRoutes(mux)
 
-	// Start server
 	addr := cfg.ServerAddr()
 	observability.Info("WebSocket server starting",
 		zap.String("address", addr),

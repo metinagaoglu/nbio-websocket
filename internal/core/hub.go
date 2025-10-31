@@ -12,14 +12,14 @@ import (
 
 type Hub struct {
 	clients      map[*Client]bool
-	connToClient map[interface{}]*Client // ✅ NEW: O(1) lookup by connection
+	connToClient map[interface{}]*Client
 	broadcast    chan []byte
 	register     chan *Client
 	unregister   chan *Client
 	disconnected chan *Client
 	mu           sync.RWMutex
-	pubsub       pubsub.PubSubAdapter // PubSub adapter for horizontal scaling
-	pubsubChan   string               // PubSub channel name
+	pubsub       pubsub.PubSubAdapter
+	pubsubChan   string
 }
 
 func (h *Hub) Broadcast() chan []byte {
@@ -37,7 +37,7 @@ func (h *Hub) Unregister(client *Client) {
 func NewHub() *Hub {
 	return &Hub{
 		clients:      make(map[*Client]bool),
-		connToClient: make(map[interface{}]*Client), // ✅ Initialize reverse map
+		connToClient: make(map[interface{}]*Client),
 		broadcast:    make(chan []byte),
 		register:     make(chan *Client),
 		unregister:   make(chan *Client),
@@ -55,15 +55,12 @@ func (h *Hub) SetPubSub(ctx context.Context, adapter pubsub.PubSubAdapter, chann
 	h.pubsub = adapter
 	h.pubsubChan = channel
 
-	// Connect to the adapter
 	if err := adapter.Connect(ctx); err != nil {
 		observability.Error("Failed to connect PubSub adapter", zap.Error(err))
 		return err
 	}
 
-	// Subscribe to receive messages from other instances
 	err := adapter.Subscribe(ctx, channel, func(msg *pubsub.Message) error {
-		// When we receive a message from pubsub, broadcast it to local clients
 		h.broadcastToLocalClients(msg.Data)
 		return nil
 	})
@@ -91,7 +88,6 @@ func (h *Hub) broadcastToLocalClients(message []byte) {
 		case client.send <- message:
 			clientCount++
 		default:
-			// Signal cleanup if send channel is full
 			go func(c *Client) {
 				h.disconnected <- c
 			}(client)
@@ -99,7 +95,6 @@ func (h *Hub) broadcastToLocalClients(message []byte) {
 	}
 	h.mu.RUnlock()
 
-	// Track messages sent
 	for i := 0; i < clientCount; i++ {
 		observability.GetMetrics().IncrementMessagesSent()
 	}
@@ -155,18 +150,14 @@ func (h *Hub) Run(ctx context.Context) {
 		case message := <-h.broadcast:
 			observability.GetMetrics().IncrementBroadcasts()
 
-			// If PubSub is enabled, publish to the adapter (all instances will receive)
 			if h.pubsub != nil && h.pubsub.IsConnected() {
 				if err := h.pubsub.Publish(ctx, h.pubsubChan, message); err != nil {
 					observability.Error("Failed to publish to PubSub",
 						zap.String("channel", h.pubsubChan),
 						zap.Error(err))
-					// Fallback to local broadcast on error
 					h.broadcastToLocalClients(message)
 				}
-				// Message will be received via subscription and distributed to local clients
 			} else {
-				// No PubSub or not connected, broadcast directly to local clients
 				h.broadcastToLocalClients(message)
 			}
 		}
@@ -191,7 +182,6 @@ func (h *Hub) closeAllClients() {
 		close(client.send)
 	}
 
-	// Clear maps
 	h.clients = make(map[*Client]bool)
 	h.connToClient = make(map[interface{}]*Client)
 	observability.Info("Closed all clients", zap.Int("count", count))

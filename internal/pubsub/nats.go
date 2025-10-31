@@ -13,12 +13,12 @@ import (
 
 // NATSAdapter implements PubSubAdapter using NATS
 type NATSAdapter struct {
-	conn         *nats.Conn
-	mu           sync.RWMutex
-	connected    bool
-	url          string
+	conn          *nats.Conn
+	mu            sync.RWMutex
+	connected     bool
+	url           string
 	subscriptions map[string]*nats.Subscription
-	shutdownChan chan struct{}
+	shutdownChan  chan struct{}
 }
 
 // NewNATSAdapter creates a new NATS adapter

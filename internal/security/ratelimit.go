@@ -11,20 +11,18 @@ import (
 
 // RateLimiter implements token bucket rate limiting per client
 type RateLimiter struct {
-	clients map[interface{}]*bucket
-	mu      sync.RWMutex
-
-	// Configuration
-	rate     int           // tokens per interval
-	interval time.Duration // refill interval
-	burst    int           // max tokens (bucket capacity)
+	clients  map[interface{}]*bucket
+	mu       sync.RWMutex
+	rate     int
+	interval time.Duration
+	burst    int
 }
 
 // bucket holds rate limit state for a single client
 type bucket struct {
-	tokens    int
+	tokens     int
 	lastRefill time.Time
-	mu        sync.Mutex
+	mu         sync.Mutex
 }
 
 // NewRateLimiter creates a new rate limiter
@@ -47,7 +45,6 @@ func (rl *RateLimiter) Allow(clientID interface{}) bool {
 	rl.mu.RUnlock()
 
 	if !exists {
-		// New client, create bucket
 		b = &bucket{
 			tokens:     rl.burst,
 			lastRefill: time.Now(),
@@ -60,7 +57,6 @@ func (rl *RateLimiter) Allow(clientID interface{}) bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	// Refill tokens based on time elapsed
 	now := time.Now()
 	elapsed := now.Sub(b.lastRefill)
 	tokensToAdd := int(elapsed / rl.interval * time.Duration(rl.rate))
@@ -73,7 +69,6 @@ func (rl *RateLimiter) Allow(clientID interface{}) bool {
 		b.lastRefill = now
 	}
 
-	// Check if we have tokens
 	if b.tokens > 0 {
 		b.tokens--
 		return true
@@ -101,9 +96,9 @@ func (rl *RateLimiter) Stats() map[string]interface{} {
 
 	return map[string]interface{}{
 		"tracked_clients": len(rl.clients),
-		"rate":           rl.rate,
-		"interval":       rl.interval.String(),
-		"burst":          rl.burst,
+		"rate":            rl.rate,
+		"interval":        rl.interval.String(),
+		"burst":           rl.burst,
 	}
 }
 

@@ -51,15 +51,11 @@ func NewRoutes(hub *core.Hub, router *protocol.Router, cfg *config.Config) *Rout
 	}
 }
 
-// RegisterRoutes registers all HTTP routes
 func (r *Routes) RegisterRoutes(mux *http.ServeMux) {
-	// WebSocket endpoint
 	mux.HandleFunc("/ws", r.handleWebSocket)
 
-	// Health check endpoint
 	mux.HandleFunc("/health", r.handleHealth)
 
-	// Metrics endpoint
 	mux.HandleFunc("/metrics", observability.MetricsHandler)
 
 	observability.Info("HTTP routes registered",
@@ -69,7 +65,6 @@ func (r *Routes) RegisterRoutes(mux *http.ServeMux) {
 
 // handleWebSocket handles WebSocket upgrade and lifecycle
 func (r *Routes) handleWebSocket(w http.ResponseWriter, req *http.Request) {
-	// Authentication check
 	if security.GlobalAuth != nil && security.GlobalAuth.IsEnabled() {
 		if err := security.GlobalAuth.ValidateRequest(req); err != nil {
 			observability.Error("Authentication failed",
@@ -81,7 +76,6 @@ func (r *Routes) handleWebSocket(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	// Setup WebSocket callbacks before upgrade
 	r.upgrader.OnOpen(func(c *websocket.Conn) {
 		client := core.NewClient(r.hub, c, r.config.Client.SendBufferSize)
 		r.hub.Register(client)
@@ -96,7 +90,6 @@ func (r *Routes) handleWebSocket(w http.ResponseWriter, req *http.Request) {
 				return
 			}
 
-			// Rate limiting check
 			if r.rateLimiter != nil && !r.rateLimiter.Allow(c) {
 				resp := protocol.NewErrorResponse(nil, protocol.InternalError, "Rate limit exceeded", map[string]string{
 					"retry_after": r.config.Security.RateLimitInterval.String(),
@@ -122,7 +115,6 @@ func (r *Routes) handleWebSocket(w http.ResponseWriter, req *http.Request) {
 		}
 	})
 
-	// Upgrade to WebSocket
 	_, err := r.upgrader.Upgrade(w, req, nil)
 	if err != nil {
 		observability.Error("WebSocket upgrade failed",
