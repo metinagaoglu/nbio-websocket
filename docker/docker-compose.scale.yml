@@ -1,0 +1,79 @@
+# Docker Compose configuration for horizontal scaling demo
+# This demonstrates running multiple WebSocket instances with Redis pub/sub
+
+version: '3.8'
+
+services:
+  # Redis for pub/sub message distribution
+  redis:
+    image: redis:7-alpine
+    container_name: nbio-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - websocket-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+
+  # WebSocket server instance (can be scaled)
+  websocket:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8080-8089:8080"  # Range for multiple instances
+      - "9090-9099:9090"  # Range for metrics
+    environment:
+      # Server configuration
+      - WS_HOST=0.0.0.0
+      - WS_PORT=8080
+
+      # Logging configuration
+      - WS_LOG_LEVEL=info
+      - WS_LOG_FORMAT=json
+
+      # PubSub configuration for scaling
+      - WS_PUBSUB_ENABLED=true
+      - WS_PUBSUB_ADAPTER=redis
+      - WS_REDIS_URL=redis://redis:6379/0
+      - WS_PUBSUB_CHANNEL=websocket.broadcast
+    networks:
+      - websocket-net
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # NGINX load balancer for WebSocket instances
+  nginx:
+    image: nginx:alpine
+    container_name: nbio-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - websocket-net
+    depends_on:
+      - websocket
+
+networks:
+  websocket-net:
+    driver: bridge
+
+volumes:
+  redis-data:
