@@ -746,9 +746,3 @@ See LICENSE file.
 - **Docker**: https://www.docker.com
 - **WebSocket Protocol**: https://tools.ietf.org/html/rfc6455
 - **JSON-RPC 2.0**: https://www.jsonrpc.org/specification
-
----
-
-**Status**: ✅ Production Ready (9.0/10)
-
-For detailed information, see documentation in `claudedocs/` directory.

@@ -311,4 +311,3 @@ docker-compose logs > backup/logs-$(date +%Y%m%d).log
 
 - **GitHub**: https://github.com/yourusername/nbio-websocket
 - **Issues**: https://github.com/yourusername/nbio-websocket/issues
-- **Docs**: See `/claudedocs` directory
