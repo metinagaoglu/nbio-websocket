@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nbio-websocket-config
+  namespace: nbio-websocket
+  labels:
+    app: nbio-websocket
+data:
+  # Server configuration
+  WS_HOST: "0.0.0.0"
+  WS_PORT: "8080"
+
+  # Client configuration
+  WS_SEND_BUFFER: "256"
+  WS_PING_INTERVAL: "10s"
+  WS_PONG_TIMEOUT: "60s"
+  WS_MAX_MESSAGE_SIZE: "1048576"
+
+  # Logging configuration
+  WS_LOG_LEVEL: "info"
+  WS_LOG_FORMAT: "json"
+
+  # Security configuration
+  WS_AUTH_ENABLED: "false"
+  WS_RATE_LIMIT_ENABLED: "false"
+
+  # PubSub configuration (for horizontal scaling)
+  WS_PUBSUB_ENABLED: "true"
+  WS_PUBSUB_ADAPTER: "redis"
+  WS_REDIS_URL: "redis://redis-service:6379/0"
+  WS_PUBSUB_CHANNEL: "websocket.broadcast"

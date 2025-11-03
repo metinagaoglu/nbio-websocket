@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nbio-websocket
+  labels:
+    app: nbio-websocket
+    environment: development
